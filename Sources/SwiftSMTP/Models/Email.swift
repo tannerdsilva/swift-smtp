@@ -2,7 +2,7 @@ import struct Foundation.Data
 import struct NIO.ByteBuffer
 
 /// Represents an email.
-public struct Email {
+public struct Email:Codable {
     /// The sender of the email.
     public var sender: Contact
     /// An optional reply-to address.
@@ -71,7 +71,11 @@ public struct Email {
 
 extension Email {
     /// Represents an email contact.
-    public struct Contact: Hashable {
+    public struct Contact:Hashable, Codable {
+		enum CodingKeys:CodingKey {
+			case name
+			case email
+		}
         /// The (full) name of the contact. Can be `nil`.
         public var name: String?
         /// The email address of the contact.
@@ -93,26 +97,85 @@ extension Email {
             self.name = name
             self.emailAddress = emailAddress
         }
+		
+		public init(from decoder:Decoder) throws {
+			let container = try decoder.container(keyedBy:CodingKeys.self)
+			self.name = try? container.decode(String.self, forKey:CodingKeys.name)
+			self.emailAddress = try container.decode(String.self, forKey:CodingKeys.email)
+		}
+		
+		public func encode(to encoder:Encoder) throws {
+			var container = encoder.container(keyedBy:CodingKeys.self)
+			if (self.name != nil) {
+				try container.encode(self.name, forKey:CodingKeys.name)
+			}
+			try container.encode(self.emailAddress, forKey:CodingKeys.email)
+		}
     }
 
     /// Represents the body of an email.
     /// - plain: A plain text body with no formatting.
     /// - html: An HTML formatted body.
     /// - universal: A body containing both, plain text and HTML. The recipient's client will determine what to show.
-    public enum Body: Hashable {
+    public enum Body:Hashable, Codable {
+		enum CodingKeys:CodingKey {
+			case plain
+			case html
+		}
+		
         case plain(String)
         case html(String)
         case universal(plain: String, html: String)
+		
+		public init(from decoder:Decoder) throws {
+			let container = try decoder.container(keyedBy:CodingKeys.self)
+			var plainString:String? = nil
+			var htmlString:String? = nil
+			do {
+				plainString = try container.decode(String.self, forKey:CodingKeys.plain)
+			} catch {}
+			do {
+				htmlString = try container.decode(String.self, forKey:CodingKeys.html)
+			} catch {}
+			if plainString != nil && htmlString != nil {
+				self = .universal(plain:plainString!, html:htmlString!)
+			} else if plainString != nil {
+				self = .plain(plainString!)
+			} else if htmlString != nil {
+				self = .html(htmlString!)
+			} else {
+				fatalError("bad data passed into Body decoder")
+			}
+		}
+		
+		public func encode(to encoder:Encoder) throws {
+			var container = encoder.container(keyedBy:CodingKeys.self)
+			switch self {
+			case let .plain(plainString):
+				try container.encode(plainString, forKey:CodingKeys.plain)
+			case let .html(htmlString):
+				try container.encode(htmlString, forKey:CodingKeys.html)
+			case let .universal(plainString, htmlString):
+				try container.encode(plainString, forKey:CodingKeys.plain)
+				try container.encode(htmlString, forKey:CodingKeys.html)
+			}
+		}
     }
 
     /// Represents an email attachment.
-    public struct Attachment {
+	public struct Attachment:Codable {
+		enum CodingKeys:CodingKey {
+			case name
+			case contentType
+			case data
+		}
+		
         /// The (file) name of the attachment.
-        public var name: String
+        public var name:String
         /// The content type of the attachment.
-        public var contentType: String
+        public var contentType:String
         /// The data of the attachment.
-        public var data: Data
+        public var data:Data
 
         /// Creates a new email attachment with the given parameters.
         /// - Parameters:
@@ -124,6 +187,13 @@ extension Email {
             self.contentType = contentType
             self.data = data
         }
+		
+		public init(from decoder:Decoder) throws {
+			let container = try decoder.container(keyedBy:CodingKeys.self)
+			self.name = try container.decode(String.self, forKey:CodingKeys.name)
+			self.contentType = try container.decode(String.self, forKey:CodingKeys.contentType)
+			self.data = Data(base64Encoded:try container.decode(String.self, forKey: CodingKeys.data))!
+		}
 
         /// Creates a new email attachment with the given parameters.
         /// - Parameters:
@@ -133,5 +203,12 @@ extension Email {
         public init(name: String, contentType: String, contents: ByteBuffer) {
             self.init(name: name, contentType: contentType, data: Data(contents.readableBytesView))
         }
+		
+		public func encode(to encoder:Encoder) throws {
+			var container = encoder.container(keyedBy:CodingKeys.self)
+			try container.encode(self.name, forKey: CodingKeys.name)
+			try container.encode(self.contentType, forKey: CodingKeys.contentType)
+			try container.encode(self.data.base64EncodedString(), forKey: CodingKeys.data)
+		}
     }
 }

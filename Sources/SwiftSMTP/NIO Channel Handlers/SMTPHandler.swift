@@ -111,7 +111,7 @@ final class SMTPHandler: ChannelInboundHandler {
                 guard !self.shouldIgnoreError($0) else { return }
                 throw $0
             }.cascade(to: allDonePromise)
-            context.close(promise: promise)
+            context.close(promise:promise)
             state = .idle(didSend: true)
         case .idle(didSend: true):
             break
