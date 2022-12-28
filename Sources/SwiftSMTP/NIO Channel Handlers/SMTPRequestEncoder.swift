@@ -51,15 +51,19 @@ struct SMTPRequestEncoder: MessageToByteEncoder {
         case .transferData(let email):
             let date = Date()
             out.writeString("From: \(email.sender.asMIME)\r\n")
-            out.writeString("To: \(email.recipients.lazy.map(\.asMIME).joined(separator: ", "))\r\n")
+            out.writeString("To: \(email.recipients.map(\.asMIME).joined(separator: ", "))\r\n")
             if let replyTo = email.replyTo {
                 out.writeString("Reply-to: \(replyTo.asMIME)\r\n")
             }
             if !email.cc.isEmpty {
-                out.writeString("Cc: \(email.cc.lazy.map(\.asMIME).joined(separator: ", "))\r\n")
+                out.writeString("Cc: \(email.cc.map(\.asMIME).joined(separator: ", "))\r\n")
             }
             out.writeString("Date: \(DateFormatter.smtp.string(from: date))\r\n")
-            out.writeString("Message-ID: <\(date.timeIntervalSince1970)\(email.sender.emailAddress.drop { $0 != "@" })>\r\n")
+            out.writeString("Message-ID: \(email.messageID)\r\n")
+            if (email.replyToID != nil) {
+            	out.writeString("In-Reply-To: \(email.replyToID!)\r\n")
+            	out.writeString("References: \(email.replyToID!)\r\n")
+            }
             out.writeString("Subject: \(email.subject)\r\n")
 
             let contentType: String

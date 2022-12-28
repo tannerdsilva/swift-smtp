@@ -1,8 +1,22 @@
 import struct Foundation.Data
+import struct Foundation.UUID
 import struct NIO.ByteBuffer
 
 /// Represents an email.
 public struct Email:Codable {
+	/// The uuid of this email
+	public var uuid:String = UUID().uuidString
+	
+	/// The MIME message-id of this email. Used for future replies
+	public var messageID:String {
+		get {
+			return "<\(uuid)\(sender.emailAddress.drop { $0 != "@" })>"
+		}
+	}
+	
+	/// The MIME message-id that this email is replying to.
+	public var replyToID:String? = nil
+	
     /// The sender of the email.
     public var sender: Contact
     /// An optional reply-to address.
@@ -49,7 +63,8 @@ public struct Email:Codable {
     ///   - subject: The subject of the email.
     ///   - body: The body of the email.
     ///   - attachments: The list of attachments of the email. Defaults to an empty array.
-    public init(sender: Contact,
+    public init(replyToID:String? = nil,
+    			sender: Contact,
                 replyTo: Contact? = nil,
                 recipients: [Contact],
                 cc: [Contact] = [],
@@ -58,6 +73,7 @@ public struct Email:Codable {
                 body: Body,
                 attachments: [Attachment] = []) {
         assert(!recipients.isEmpty, "Recipients must not be empty!")
+        self.replyToID = replyToID
         self.sender = sender
         self.replyTo = replyTo
         self.recipients = recipients
